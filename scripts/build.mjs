@@ -1,21 +1,38 @@
 import { execSync } from 'child_process';
 
-// 1. Automatically map Vercel Postgres / Neon variables if DATABASE_URL is not set directly
-const realDbUrl =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.POSTGRES_URL_NON_POOLING;
+function isValidPostgresUrl(url) {
+  return (
+    typeof url === 'string' &&
+    (url.startsWith('postgres://') || url.startsWith('postgresql://'))
+  );
+}
 
-const realDirectUrl =
-  process.env.DIRECT_URL ||
-  process.env.POSTGRES_URL_NON_POOLING ||
-  realDbUrl;
+function resolvePostgresUrl(...candidates) {
+  for (const candidate of candidates) {
+    if (isValidPostgresUrl(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+const realDbUrl = resolvePostgresUrl(
+  process.env.DATABASE_URL,
+  process.env.POSTGRES_PRISMA_URL,
+  process.env.POSTGRES_URL,
+  process.env.POSTGRES_URL_NON_POOLING
+);
+
+const realDirectUrl = resolvePostgresUrl(
+  process.env.DIRECT_URL,
+  process.env.POSTGRES_URL_NON_POOLING,
+  realDbUrl
+);
 
 if (realDbUrl) {
   process.env.DATABASE_URL = realDbUrl;
 } else {
-  // Provide dummy URL for prisma generate if no DB URL is configured yet
+  // Use build-time placeholder when no valid connection string is found
   process.env.DATABASE_URL = 'postgresql://placeholder:placeholder@localhost:5432/placeholder';
 }
 
@@ -26,8 +43,8 @@ if (realDirectUrl) {
 }
 
 console.log('--- CarePilot Build Environment ---');
-console.log('DATABASE_URL:', realDbUrl ? '✓ Connected' : '⚠️ Missing (Using build placeholder)');
-console.log('DIRECT_URL:  ', realDirectUrl ? '✓ Connected' : '⚠️ Missing (Using build placeholder)');
+console.log('DATABASE_URL:', realDbUrl ? '✓ Valid Postgres URL detected' : '⚠️ No valid Postgres URL detected (Using placeholder)');
+console.log('DIRECT_URL:  ', realDirectUrl ? '✓ Valid Direct URL detected' : '⚠️ No valid Direct URL detected (Using placeholder)');
 console.log('-----------------------------------');
 
 try {
@@ -41,7 +58,7 @@ try {
     console.log('> Step 3: Seeding Database Records');
     execSync('npx tsx prisma/seed.ts', { stdio: 'inherit', env: process.env });
   } else {
-    console.log('⚠️ Skipping DB migrations and seed because database connection URL was not provided.');
+    console.log('⚠️ Skipping DB migrations and seed step because a valid database connection string was not provided.');
   }
 
   console.log('> Step 4: Building Next.js Application');

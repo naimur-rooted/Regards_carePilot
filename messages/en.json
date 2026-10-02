@@ -285,12 +285,17 @@
     "switchToRegister": "Create an account",
     "switchToSignIn": "Sign in instead",
     "invalid": "That email address or password is not correct.",
-    "errorGeneric": "We could not sign you in. Please try again.",
     "passwordHint": "At least 8 characters.",
     "registerSuccess": "Account created. Please sign in.",
     "rateLimited": "Too many attempts. Please wait a moment and try again."
   },
   "portal": {
+    "quickTitle": "Online Diagnostic Report",
+    "portalSubtitle": "Download or check report status",
+    "fieldsRequired": "Please fill in both Registration No and PIN",
+    "regNo": "Patient / Registration ID",
+    "pin": "Report PIN / Password",
+    "checkStatus": "View / Download Report",
     "title": "Patient portal",
     "lede": "Your appointments, reports and profile in one private place.",
     "welcome": "Welcome back, {name}",

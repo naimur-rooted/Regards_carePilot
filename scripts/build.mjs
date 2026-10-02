@@ -52,13 +52,13 @@ try {
   execSync('npx prisma generate', { stdio: 'inherit', env: process.env });
 
   if (realDbUrl) {
-    console.log('> Step 2: Running Database Migrations');
-    execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });
+    console.log('> Step 2: Synchronizing Database Schema (prisma db push)');
+    execSync('npx prisma db push --skip-generate', { stdio: 'inherit', env: process.env });
 
     console.log('> Step 3: Seeding Database Records');
     execSync('npx tsx prisma/seed.ts', { stdio: 'inherit', env: process.env });
   } else {
-    console.log('⚠️ Skipping DB migrations and seed step because a valid database connection string was not provided.');
+    console.log('⚠️ Skipping DB sync and seed step because a valid database connection string was not provided.');
   }
 
   console.log('> Step 4: Building Next.js Application');

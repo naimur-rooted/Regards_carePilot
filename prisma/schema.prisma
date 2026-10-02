@@ -1,0 +1,453 @@
+// CarePilot database schema
+// PostgreSQL (Supabase) + Prisma.
+// Bilingual content is stored with explicit _en / _bn column pairs so that
+// queries stay type-safe and no translation can silently go missing.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Locale {
+  en
+  bn
+}
+
+enum Role {
+  PATIENT
+  STAFF
+  EDITOR
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum RequestStatus {
+  NEW
+  CONTACTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum SubmissionStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  SPAM
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TestCategory {
+  PATHOLOGY
+  RADIOLOGY
+  CARDIOLOGY
+  IMAGING
+  PACKAGE
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// Identity: NextAuth.js backed by Supabase Auth as the identity provider
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  phone         String?
+  locale        Locale    @default(en)
+  role          Role      @default(PATIENT)
+  supabaseId    String?   @unique @map("supabase_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts     Account[]
+  sessions     Session[]
+  appointments Appointment[]
+  reports      Report[]
+  addresses    SavedAddress[]
+  deviceTokens DeviceToken[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Clinical content. Sanity.io is the authoring surface; these tables are the
+// queryable mirror used by the public site (seeded from, and re-synced with,
+// the Sanity dataset).
+// ---------------------------------------------------------------------------
+
+model Specialty {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  nameEn        String   @map("name_en")
+  nameBn        String   @map("name_bn")
+  descriptionEn String?  @map("description_en") @db.Text
+  descriptionBn String?  @map("description_bn") @db.Text
+  icon          String?
+  order         Int      @default(0)
+  isActive      Boolean  @default(true) @map("is_active")
+  sanityId      String?  @unique @map("sanity_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  doctors Doctor[]
+  tests   DiagnosticTest[]
+
+  @@index([isActive, order])
+  @@map("specialties")
+}
+
+model Branch {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  nameEn         String   @map("name_en")
+  nameBn         String   @map("name_bn")
+  addressEn      String   @map("address_en") @db.Text
+  addressBn      String   @map("address_bn") @db.Text
+  cityEn         String   @map("city_en")
+  cityBn         String   @map("city_bn")
+  phone          String
+  altPhone       String?  @map("alt_phone")
+  email          String?
+  hoursEn        String?  @map("hours_en")
+  hoursBn        String?  @map("hours_bn")
+  mapUrl         String?  @map("map_url")
+  latitude       Float?
+  longitude      Float?
+  imagePublicId  String?  @map("image_public_id")
+  isActive       Boolean  @default(true) @map("is_active")
+  offersHomeCollection Boolean @default(false) @map("offers_home_collection")
+  order          Int      @default(0)
+  sanityId       String?  @unique @map("sanity_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  doctors          DoctorBranch[]
+  tests            DiagnosticTest[]
+  sampleRequests   SampleCollectionRequest[]
+  contactMessages  ContactSubmission[]
+  appointments     Appointment[]
+
+  @@index([isActive, order])
+  @@map("branches")
+}
+
+model Doctor {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  nameEn           String   @map("name_en")
+  nameBn           String   @map("name_bn")
+  designationEn    String   @map("designation_en")
+  designationBn    String   @map("designation_bn")
+  bioEn            String?  @map("bio_en") @db.Text
+  bioBn            String?  @map("bio_bn") @db.Text
+  qualificationsEn String?  @map("qualifications_en") @db.Text
+  qualificationsBn String?  @map("qualifications_bn") @db.Text
+  gender           Gender?
+  photoPublicId    String?  @map("photo_public_id")
+  bmdcRegNo        String?  @map("bmdc_reg_no")
+  experienceYears  Int?     @map("experience_years")
+  languages        String[] @default([])
+  isFeatured       Boolean  @default(false) @map("is_featured")
+  isActive         Boolean  @default(true) @map("is_active")
+  order            Int      @default(0)
+  specialtyId      String   @map("specialty_id")
+  sanityId         String?  @unique @map("sanity_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  specialty    Specialty      @relation(fields: [specialtyId], references: [id])
+  branches     DoctorBranch[]
+  appointments Appointment[]
+
+  @@index([specialtyId, isActive])
+  @@index([isFeatured, isActive])
+  @@map("doctors")
+}
+
+model DoctorBranch {
+  doctorId        String   @map("doctor_id")
+  branchId        String   @map("branch_id")
+  scheduleEn      String?  @map("schedule_en") @db.Text
+  scheduleBn      String?  @map("schedule_bn") @db.Text
+  consultationFee Decimal? @map("consultation_fee") @db.Decimal(10, 2)
+  isPrimary       Boolean  @default(false) @map("is_primary")
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, branchId])
+  @@map("doctor_branches")
+}
+
+model DiagnosticTest {
+  id              String       @id @default(cuid())
+  slug            String       @unique
+  nameEn          String       @map("name_en")
+  nameBn          String       @map("name_bn")
+  category        TestCategory @default(PATHOLOGY)
+  summaryEn       String?      @map("summary_en") @db.Text
+  summaryBn       String?      @map("summary_bn") @db.Text
+  preparationEn   String?      @map("preparation_en") @db.Text
+  preparationBn   String?      @map("preparation_bn") @db.Text
+  price           Decimal?     @db.Decimal(10, 2)
+  discountedPrice Decimal?     @map("discounted_price") @db.Decimal(10, 2)
+  reportHours     Int?         @map("report_hours")
+  homeCollection  Boolean      @default(false) @map("home_collection")
+  isActive        Boolean      @default(true) @map("is_active")
+  order           Int          @default(0)
+  branchId        String?      @map("branch_id")
+  specialtyId     String?      @map("specialty_id")
+  sanityId        String?      @unique @map("sanity_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  branch    Branch?    @relation(fields: [branchId], references: [id])
+  specialty Specialty? @relation(fields: [specialtyId], references: [id])
+
+  @@index([category, isActive])
+  @@map("diagnostic_tests")
+}
+
+model Article {
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  titleEn        String        @map("title_en")
+  titleBn        String        @map("title_bn")
+  excerptEn      String?       @map("excerpt_en") @db.Text
+  excerptBn      String?       @map("excerpt_bn") @db.Text
+  bodyEn         Json?         @map("body_en")
+  bodyBn         Json?         @map("body_bn")
+  coverPublicId  String?       @map("cover_public_id")
+  category       String?
+  tags           String[]      @default([])
+  authorName     String?       @map("author_name")
+  reviewedBy     String?       @map("reviewed_by")
+  publishedAt    DateTime?     @map("published_at")
+  reviewDate     DateTime?     @map("review_date")
+  readingMinutes Int?          @map("reading_minutes")
+  status         ContentStatus @default(DRAFT)
+  sanityId       String?       @unique @map("sanity_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([status, publishedAt])
+  @@map("articles")
+}
+
+model Notice {
+  id          String        @id @default(cuid())
+  slug        String?       @unique
+  titleEn     String        @map("title_en")
+  titleBn     String        @map("title_bn")
+  bodyEn      String?       @map("body_en") @db.Text
+  bodyBn      String?       @map("body_bn") @db.Text
+  isPinned    Boolean       @default(false) @map("is_pinned")
+  publishedAt DateTime      @default(now()) @map("published_at")
+  expiresAt   DateTime?     @map("expires_at")
+  status      ContentStatus @default(PUBLISHED)
+  sanityId    String?       @unique @map("sanity_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@index([status, publishedAt])
+  @@map("notices")
+}
+
+// ---------------------------------------------------------------------------
+// Patient-initiated requests captured by the public site
+// ---------------------------------------------------------------------------
+
+model SampleCollectionRequest {
+  id               String        @id @default(cuid())
+  referenceCode    String        @unique @map("reference_code")
+  fullName         String        @map("full_name")
+  phone            String
+  email            String?
+  address          String        @db.Text
+  area             String?
+  city             String?
+  testsRequested   String[]      @map("tests_requested")
+  preferredDate    DateTime      @map("preferred_date")
+  preferredSlot    String        @map("preferred_slot")
+  notes            String?       @db.Text
+  locale           Locale        @default(en)
+  status           RequestStatus @default(NEW)
+  branchId         String?       @map("branch_id")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([status, createdAt])
+  @@map("sample_collection_requests")
+}
+
+model ContactSubmission {
+  id         String           @id @default(cuid())
+  fullName   String           @map("full_name")
+  email      String
+  phone      String?
+  department String?
+  subject    String?
+  message    String           @db.Text
+  locale     Locale           @default(en)
+  status     SubmissionStatus @default(NEW)
+  branchId   String?          @map("branch_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([status, createdAt])
+  @@map("contact_submissions")
+}
+
+model Appointment {
+  id            String        @id @default(cuid())
+  referenceCode String        @unique @map("reference_code")
+  patientName   String        @map("patient_name")
+  phone         String
+  email         String?
+  preferredDate DateTime      @map("preferred_date")
+  timeSlot      String        @map("time_slot")
+  reason        String?       @db.Text
+  status        RequestStatus @default(NEW)
+  locale        Locale        @default(en)
+  userId        String?       @map("user_id")
+  doctorId      String?       @map("doctor_id")
+  branchId      String?       @map("branch_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  user   User?   @relation(fields: [userId], references: [id])
+  doctor Doctor? @relation(fields: [doctorId], references: [id])
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("appointments")
+}
+
+/// Report metadata for the patient portal. Files themselves live in
+/// Cloudinary; the portal only ever exposes released reports to their owner.
+model Report {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  title        String
+  testName     String?  @map("test_name")
+  reportDate   DateTime @map("report_date")
+  filePublicId String?  @map("file_public_id")
+  fileUrl      String?  @map("file_url")
+  isReleased   Boolean  @default(false) @map("is_released")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isReleased])
+  @@map("reports")
+}
+
+// ---------------------------------------------------------------------------
+// Mobile companion app support.
+// Both tables are shared with the website: an address saved in the app is the
+// same row the website address book reads.
+// ---------------------------------------------------------------------------
+
+/// A patient's saved collection/visit address. Shared by the website address
+/// book and the mobile app's address picker.
+model SavedAddress {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  label     String   @default("Home")
+  fullName  String   @map("full_name")
+  phone     String
+  address   String   @db.Text
+  area      String?
+  city      String?
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isDefault])
+  @@map("saved_addresses")
+}
+
+/// Firebase Cloud Messaging registration for push notifications
+/// (appointment reminders, report-ready alerts, notice broadcasts).
+model DeviceToken {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  token      String   @unique
+  platform   String
+  locale     Locale   @default(en)
+  appVersion String?  @map("app_version")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}

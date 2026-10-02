@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="rc-fav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00b050" />
+      <stop offset="50%" stop-color="#008040" />
+      <stop offset="100%" stop-color="#004d25" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#002d15" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  
+  <!-- Outer Rounded Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#rc-fav-grad)" />
+  
+  <!-- Inner Glass Accent Ring -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="10" />
+
+  <!-- Medical Cross (+) Icon -->
+  <g filter="url(#shadow)">
+    <!-- Vertical Bar -->
+    <rect x="216" y="112" width="80" height="288" rx="28" fill="#ffffff" />
+    <!-- Horizontal Bar -->
+    <rect x="112" y="216" width="288" height="80" rx="28" fill="#ffffff" />
+    <!-- Center Accent Dot -->
+    <circle cx="256" cy="256" r="24" fill="#008040" />
+  </g>
+</svg>

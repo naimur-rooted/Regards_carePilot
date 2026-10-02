@@ -60,23 +60,23 @@ export default async function DoctorProfilePage({
       </nav>
 
       {/* Main Profile Header Banner Card */}
-      <div className="rounded-panel border border-line bg-paper p-6 sm:p-8 shadow-lifted">
-        <div className="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
+      <div className="rounded-panel border border-line bg-paper p-6 sm:p-10 shadow-lifted">
+        <div className="grid gap-8 lg:grid-cols-[320px_1fr] items-start">
           {/* Avatar / Photo Box */}
           <div className="relative mx-auto lg:mx-0">
-            <div className="h-60 w-60 overflow-hidden rounded-2xl bg-teal-soft border border-line shadow-md flex items-center justify-center">
+            <div className="h-72 w-72 lg:h-80 lg:w-80 overflow-hidden rounded-2xl bg-teal-soft border border-line shadow-md flex items-center justify-center">
               {photo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photo} alt={doctor.name} className="h-full w-full object-cover" />
               ) : (
-                <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#006a33] to-[#00984a] text-white text-5xl font-extrabold">
+                <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#006a33] to-[#00984a] text-white text-6xl font-extrabold">
                   {initialsAvatar(doctor.name)}
                 </div>
               )}
             </div>
 
-            <div className="mt-3 text-center">
-              <span className="pill bg-teal text-white font-extrabold text-[0.65rem] uppercase tracking-wider">
+            <div className="mt-4 text-center">
+              <span className="pill bg-teal text-white font-extrabold text-[0.72rem] uppercase tracking-wider py-1.5 px-4">
                 ✓ Verified Specialist
               </span>
             </div>

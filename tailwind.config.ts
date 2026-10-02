@@ -39,7 +39,7 @@ const config: Config = {
         lifted: '0 22px 60px rgba(25, 59, 58, 0.12)',
       },
       maxWidth: {
-        shell: '1180px',
+        shell: '1440px',
       },
       keyframes: {
         rise: {
